@@ -2,6 +2,7 @@ package com.typesafe.slick.examples.lifted
 
 // Use H2Driver to connect to an H2 database
 import scala.slick.driver.H2Driver.simple._
+import scala.slick.lifted.MappedProjection
 
 /**
  * A simple example that uses statically typed queries against an in-memory
@@ -17,7 +18,7 @@ object FoxChickenGrainExample extends App {
   case class Grain(id: Int, name: String)
 
   case class ChickenGrain(chicken: Chicken, grain: Option[Grain])
-  case class FoxChickenGrain(fox: Fox, chickenGrain: Option[ChickenGrain])
+  case class FoxChickenGrain(fox: Fox, chicken: Option[Chicken], grain: Option[Grain])
 
   // Tables -------------------------------------
 
@@ -31,6 +32,8 @@ object FoxChickenGrainExample extends App {
       { (_: Any) => sys.error("Can't insert into optional projection")})
   }
 
+  type OptionalFox = MappedProjection[Option[Fox],(Option[Int], Option[String], Option[Int])]
+
   val FoxQuery = TableQuery[FoxTable]
 
   class ChickenTable(tag: Tag) extends Table[Chicken](tag, "CHICKEN") {
@@ -43,6 +46,8 @@ object FoxChickenGrainExample extends App {
       { (_: Any) => sys.error("Can't insert into optional projection")})
   }
 
+  type OptionalChicken = MappedProjection[Option[Chicken],(Option[Int], Option[String], Option[Int])]
+
   val ChickenQuery = TableQuery[ChickenTable]
 
   class GrainTable(tag: Tag) extends Table[Grain](tag, "GRAIN") {
@@ -54,13 +59,44 @@ object FoxChickenGrainExample extends App {
       { (_: Any) => sys.error("Can't insert into optional projection")})
   }
 
+  type OptionalGrain = MappedProjection[Option[Grain],(Option[Int], Option[String])]
+
   val GrainQuery = TableQuery[GrainTable]
 
   // Shapes -------------------------------------
 
-  val foxChickenGrainShape = ???
+  final class FoxChickenGrainShape[Level <: ShapeLevel](val shapes: Seq[Shape[_, _, _, _]])
+    extends MappedScalaProductShape[Level, Product, (FoxTable, OptionalChicken, OptionalGrain), FoxChickenGrain, (FoxTable, OptionalChicken, OptionalGrain)] {
 
-  val chickenGrainShape = ???
+    def buildValue(elems: IndexedSeq[Any]) =
+      if(elems(0).isInstanceOf[FoxTable]) {
+        (elems(0).asInstanceOf[FoxTable], elems(1).asInstanceOf[OptionalChicken], elems(2).asInstanceOf[OptionalGrain])
+      } else {
+        FoxChickenGrain(elems(0).asInstanceOf[Fox], elems(1).asInstanceOf[Option[Chicken]], elems(2).asInstanceOf[Option[Grain]])
+      }
+    def copy(shapes: Seq[Shape[_, _, _, _]]) = new FoxChickenGrainShape(shapes)
+  }
+
+  implicit def foxChickenGrainShape[Level <: ShapeLevel] = new FoxChickenGrainShape[Level](Seq(
+    FoxQuery.unpackable.shape,
+    ChickenQuery.unpackable.shape,
+    GrainQuery.unpackable.shape))
+
+  final class ChickenGrainShape[Level <: ShapeLevel](val shapes: Seq[Shape[_, _, _, _]])
+    extends MappedScalaProductShape[Level, Product, (ChickenTable, OptionalGrain), ChickenGrain, (ChickenTable, OptionalGrain)] {
+
+    def buildValue(elems: IndexedSeq[Any]) =
+      if(elems(0).isInstanceOf[ChickenTable]) {
+        (elems(0).asInstanceOf[ChickenTable], elems(1).asInstanceOf[OptionalGrain])
+      } else {
+        ChickenGrain(elems(0).asInstanceOf[Chicken], elems(1).asInstanceOf[Option[Grain]])
+      }
+    def copy(shapes: Seq[Shape[_, _, _, _]]) = new ChickenGrainShape(shapes)
+  }
+
+  implicit def chickenGrainShape[Level <: ShapeLevel] = new ChickenGrainShape[Level](Seq(
+    ChickenQuery.unpackable.shape,
+    GrainQuery.unpackable.shape))
 
   // Aggregates ---------------------------------
 
@@ -102,6 +138,10 @@ object FoxChickenGrainExample extends App {
     for(chickenGrain <- ChickenGrainQuery) {
       println(chickenGrain)
     }
+
+    // println()
+    // println("Filtered ChickenGrainQuery:")
+    // ChickenGrainQuery where { case (c, g) => g.name === "Grain 1" } foreach { println }
 
     println()
     println("FoxChickenGrainQuery:")
