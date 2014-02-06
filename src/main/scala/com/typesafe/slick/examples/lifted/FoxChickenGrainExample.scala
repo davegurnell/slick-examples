@@ -6,8 +6,6 @@ import scala.slick.lifted.{ AbstractTable, ColumnBase, MappedProjection }
 
 object FoxChickenGrainExample extends App {
 
-  // Case classes -------------------------------
-
   // This example maps three database tables, `Fox`, `Chicken`, and `Grain`,
   // and models two left-join queries on the tables:
   //
@@ -33,7 +31,7 @@ object FoxChickenGrainExample extends App {
   case class ChickenGrain(chicken: Chicken, grain: Option[Grain])
   case class FoxChickenGrain(fox: Fox, chicken: Option[Chicken], grain: Option[Grain])
 
-  // OptionTable --------------------------------
+  // TableAndMappedProjection -------------------
 
   // This is an attempt to create a data structure that behaves like a MappedProjection but
   // keeps a referenced to the original table to allow the developer to refer to the columns
